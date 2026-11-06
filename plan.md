@@ -10,6 +10,24 @@ Retain the existing wire protocol and facade behaviour. This is not a proposal t
 
 Make each step independently testable and deployable. Server migration, client migration, SDK workflow extraction and CLI repository extraction are separate changes, not a single coordinated switchover.
 
+## Target State
+
+```mermaid
+flowchart TB
+    A["<b>Authored API contract</b><br/>facades, versions, methods, payloads, errors, watchers"]
+    B["<b>Generators</b>"]
+    A --> B
+
+    B --> C1["Go wire types<br/>+ low-level client"]
+    B --> C2["Go server interfaces<br/>+ dispatch"]
+    B --> C3["TypeScript types<br/>+ facade clients"]
+
+    C1 --> D1["<b>SDK</b><br/>shared workflows, e.g. Deploy"]
+    D1 --> E1["CLI<br/>Terraform provider<br/>JIMM client"]
+    C2 --> E2["Juju controller<br/>JIMM server"]
+    C3 --> E3["js-libjuju<br/>→ Dashboard"]
+```
+
 ## Repository Responsibilities
 
 ### This Repository
@@ -104,6 +122,30 @@ Use handwritten adaptations only where versions differ meaningfully. Select base
 The definition repository may retain more versions than any one server serves. The client support matrix and server registrations are separate selections. Specify the complete supported controller range before claiming compatibility.
 
 ## Reflection Import During Transition
+
+The direction of the source of truth reverses: today Juju's Go code defines the API and the schema is derived from it; in the target state the authored contract defines the API and the Go code is generated from it.
+
+```mermaid
+flowchart LR
+    subgraph Today["Today"]
+        direction LR
+        T1["Juju Go code"] -->|reflection| T2["schema.json"]
+    end
+
+    subgraph Migration["Transition (per facade version)"]
+        direction LR
+        M1["Reflection baseline<br/><i>evidence only</i>"] -->|"manual review"| M2["Authored contract"]
+    end
+
+    subgraph Target["Target"]
+        direction LR
+        G1["Authored contract"] -->|generate| G2["Server bindings<br/>+ clients"]
+    end
+
+    Today --> Migration --> Target
+    T1 -.->|"exported once"| M1
+    M2 -.->|"generated bindings replace<br/>handwritten dispatch"| T1
+```
 
 Use Juju's current reflection/schema machinery as the structural baseline. Export every required facade version, not only the latest, and include Admin and relevant agent facades. Capture pinned revisions from Juju 3.6 and the relevant 4.x branches.
 
